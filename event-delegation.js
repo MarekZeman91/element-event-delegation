@@ -1,39 +1,39 @@
 /**
  * Author: Marek Zeman
  * Twitter: MarekZeman91
- * Site: http://marekzeman.cz
  * License: MIT
- * Version: 1
- * Revision: 4.5.2016 // created
+ * Version: 1.01
+ * Revision: 20.7.2016 // Better support for minification
  */
 (function () {
-    var Cache = {
-        delegated: {},
-        get: function (type, selector, useCapture) {
-            var cache = Cache.delegated;
-            var i, l = arguments.length;
-            for (i = 0; i < l && cache; i++) {
-                cache = cache[arguments[i]];
-            }
-            return cache;
-        },
-        set: function (type, selector, useCapture, item) {
-            var cache = Cache.delegated;
-            var i, l = arguments.length-1;
-            for (i = 0; i < l; i++) cache = cache[arguments[i]] || (
-                cache[arguments[i]] = i+1 === l ? [] : {}
-            );
-            return (cache.push(item), item);
+    var delegated = {};
+
+    function get(type, selector, useCapture) {
+        var cache = delegated, args = arguments;
+        var i, l = args.length;
+        for (i = 0; i < l && cache; i++) {
+            cache = cache[args[i]];
         }
-    };
+        return cache;
+    }
+
+    function set(type, selector, useCapture, item) {
+        var cache = delegated, args = arguments;
+        var i, l = args.length - 1;
+        for (i = 0; i < l; i++) cache = cache[args[i]] || (
+            cache[args[i]] = i + 1 === l ? [] : {}
+        );
+        return (cache.push(item), item);
+    }
 
     var proto = Element.prototype;
+    var matchesFn = 'MatchesSelector';
     var matches = (
-        proto.matches            ||
-        proto.oMatchesSelector   ||
-        proto.msMatchesSelector  ||
-        proto.mozMatchesSelector ||
-        proto.webkitMatchesSelector
+        proto.matches ||
+        proto['o' + matchesFn] ||
+        proto['ms' + matchesFn] ||
+        proto['moz' + matchesFn] ||
+        proto['webkit' + matchesFn]
     );
 
     function targetHandler(event, selector, listener) {
@@ -60,16 +60,17 @@
         while (target && target !== this);
     }
 
-    proto.delegateEventListener = function (type, selector, listener, useCapture) {
+    var delegateFn = 'delegateEventListener';
+    proto[delegateFn] = function (type, selector, listener, useCapture) {
         var obj = {selector: selector, listener: listener};
         this.addEventListener(type, obj.handler = function (event) {
             targetHandler.call(this, event, selector, listener);
         }, useCapture);
-        Cache.set(type, selector, useCapture, obj);
+        set(type, selector, useCapture, obj);
     };
 
-    proto.undelegateEventListener = function (type, selector, listener, useCapture) {
-        var cache = Cache.get(type, selector, useCapture);
+    proto['un' + delegateFn] = function (type, selector, listener, useCapture) {
+        var cache = get(type, selector, useCapture);
         for (var i = 0; (cache || [])[i]; i++) {
             if (cache[i].listener !== listener) continue;
             this.removeEventListener(type, cache[i].handler, useCapture);
